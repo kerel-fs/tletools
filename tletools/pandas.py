@@ -40,6 +40,8 @@ You can also load multiple files into a single :class:`pandas.DataFrame` with
 >>> load_dataframe(glob("*.txt")) # doctest: +SKIP
 """
 
+from collections import defaultdict
+
 import pandas as pd
 
 from .tle import TLE
@@ -100,3 +102,28 @@ def add_epoch(df):
     years = (df.epoch_year.values - 1970).astype(dt_dt64_Y)
     days = ((df.epoch_day.values - 1) * 86400 * 1000000).astype(dt_td64_us)
     df['epoch'] = years + days
+
+
+TLETOOLS_TLE_KEYS = ['name', 'norad', 'classification', 'int_desig', 'epoch_year', 'epoch_day', 'dn_o2', 'ddn_o6', 'bstar', 'set_num', 'inc', 'raan', 'ecc', 'argp', 'M', 'n', 'rev_num']
+
+
+def add_apsides(df, save_orbit=False):
+    """Add the columns ``'r_a'``, ``'r_p'`` and ``'a'`` to a dataframe.
+
+    `df` must have all columns in TLETOOLS_TLE_KEYS.
+
+    :param pandas.DataFrame df: :class:`pandas.DataFrame` instance to modify.
+    """
+    new_columns = defaultdict(list)
+    for i, tle_dict in df.iterrows():
+        tle_arguments = {key: tle_dict[key] for key in TLETOOLS_TLE_KEYS}
+        tle = TLE(**tle_arguments)
+        orbit = tle.to_orbit()
+        new_columns['r_a'].append(orbit.r_a.value)
+        new_columns['r_p'].append(orbit.r_p.value)
+        new_columns['a'].append(orbit.a.value)
+        if save_orbit:
+            new_columns['orbit'] = orbit
+
+    for column_name, column in new_columns.items():
+        df[column_name] = column
